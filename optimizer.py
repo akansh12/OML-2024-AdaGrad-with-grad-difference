@@ -73,7 +73,7 @@ class AdamWithDiff(Optimizer):
                 state['step'] += 1 
                 m, v, prev_grad, = state['m'], state['v'], state['prev_grad']
                 beta1, beta2 = group['betas']
-                # lr, eps = group['lr'], group['eps']
+
 
                 # Just adding the square of the weights to the loss function is *not*
                 # the correct way of using L2 regularization/weight decay with Adam,
@@ -101,7 +101,7 @@ class AdamWithDiff(Optimizer):
                 state['prev_grad'] = grad.clone()
                 state['m'], state['v'] = m.clone(), v.clone()
                 
-        return loss, denom#, grad_norm
+        return loss, denom
             
 class Adam(Optimizer):
     """
@@ -199,7 +199,7 @@ class Adam(Optimizer):
                 state['prev_grad'] = grad.clone()
                 state['m'], state['v'] = m, v
                 
-        return loss, denom#, grad_norm
+        return loss, denom
 
 
 class AdaGradWithDiff(Optimizer):
@@ -271,27 +271,71 @@ class AdaGradWithDiff(Optimizer):
 
                 # At the end, change previous gradient to current gradient
                 state['prev_grad'] = grad.clone()
+                state['sum_grad_diffs'] = sum_grad_diffs.clone()
 
-        return loss
+        return loss, denom
 
 class AdaGrad(Optimizer):
     def __init__(self, params, lr=1e-2, eps=1e-10):
+        """
+        Initializes the optimizer with hyperparameters.
+
+        Args:
+            params (iterable): Iterable of parameters to optimize.
+            lr (float, optional): Learning rate. Defaults to 1e-2.
+            eps (float, optional): Epsilon for numerical stability. Defaults to 1e-8.
+        """
+        if not 0.0 <= lr:
+            raise ValueError("Invalid learning rate: {}".format(lr))
+        if not 0.0 <= eps:
+            raise ValueError("Invalid epsilon value: {}".format(eps))
+
         defaults = dict(lr=lr, eps=eps)
         super(AdaGrad, self).__init__(params, defaults)
+
+        # State initialization
+        for group in self.param_groups:
+            for p in group['params']:
+                state = self.state[p]
+                state['step'] = 0                                   # Steps for optimization
+                state['sum_grads'] = torch.zeros_like(p.data)  # Sum of gradient difference
+
+    def __setstate__(self, state):
+        super(AdaGrad, self).__setstate__(state)
     
-    def step(self):
+    def step(self, closure=None):
+        """
+        Performs a single optimization step.
+
+        Args:
+            closure (callable, optional): A closure that reevaluates the model
+                and returns the loss. Defaults to None.
+
+        Returns:
+            Optional[Tensor]: None if closure is None, otherwise
+                the closure return value.
+        """
+        loss = None
+        if closure is not None:
+            loss = closure()
         for group in self.param_groups:
             for p in group['params']:
                 if p.grad is None:
                     continue
                 grad = p.grad.data
+                if grad.is_sparse:
+                    raise RuntimeError('AdaGrad does not support sparse gradients, please consider other optimizers.')
+                
                 state = self.state[p]
 
-                if 'sum_sq' not in state:
-                    state['sum_sq'] = torch.zeros_like(p.data)
+                state['step'] += 1
+                sum_grads = state['sum_grads']
 
-                state['sum_sq'].addcmul_(grad, grad)
-                std = state['sum_sq'].sqrt().add_(group['eps'])
-                p.data.addcdiv_(-group['lr'], grad, std)
+                sum_grads.addcmul_(grad, grad)
+                denom = sum_grads.sqrt().add_(group['eps'])
 
-                
+                p.data.addcdiv_(-group['lr'], grad, denom)
+
+                state['sum_grads'] = sum_grads.clone()
+
+        return loss, denom
