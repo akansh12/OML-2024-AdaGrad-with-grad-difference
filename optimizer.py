@@ -1,8 +1,6 @@
 import torch
 from torch.optim import Optimizer
 
-from utils import *
-
 
 
 class AdamWithDiff(Optimizer):
@@ -101,7 +99,8 @@ class AdamWithDiff(Optimizer):
                 state['prev_grad'] = grad.clone()
                 state['m'], state['v'] = m.clone(), v.clone()
                 
-        return loss, denom
+
+        return loss, denom.sum()
             
 class Adam(Optimizer):
     """
@@ -129,7 +128,7 @@ class Adam(Optimizer):
             raise ValueError("Invalid beta parameter at index 1: {}".format(betas[1]))
 
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, correct_bias=correct_bias)
-        super(AdamWithDiff, self).__init__(params, defaults)
+        super(Adam, self).__init__(params, defaults)
 
         # State initialization
         for group in self.param_groups:
@@ -138,10 +137,9 @@ class Adam(Optimizer):
                 state['step'] = 0                               # Steps for optimization
                 state['m'] = torch.zeros_like(p.data)      # Exponential moving average of gradient values
                 state['v'] = torch.zeros_like(p.data)   # Exponential moving average of squared gradient values
-                state['prev_grad'] = torch.zeros_like(p.data)   # Previous gradient
     
     def __setstate__(self, state):
-        super(AdamWithDiff, self).__setstate__(state)
+        super(Adam, self).__setstate__(state)
 
     def step(self, closure=None):
         """
@@ -169,9 +167,8 @@ class Adam(Optimizer):
                 state = self.state[p]
 
                 state['step'] += 1 
-                m, v, prev_grad, = state['m'], state['v'], state['prev_grad']
+                m, v = state['m'], state['v']
                 beta1, beta2 = group['betas']
-                # lr, eps = group['lr'], group['eps']
 
                 # Just adding the square of the weights to the loss function is *not*
                 # the correct way of using L2 regularization/weight decay with Adam,
@@ -196,10 +193,9 @@ class Adam(Optimizer):
 
                 p.data.addcdiv_(-group['lr'], m_hat, denom)
 
-                state['prev_grad'] = grad.clone()
-                state['m'], state['v'] = m, v
+                state['m'], state['v'] = m.clone(), v.clone()
                 
-        return loss, denom
+        return loss, denom.sum()
 
 
 class AdaGradWithDiff(Optimizer):
@@ -273,7 +269,7 @@ class AdaGradWithDiff(Optimizer):
                 state['prev_grad'] = grad.clone()
                 state['sum_grad_diffs'] = sum_grad_diffs.clone()
 
-        return loss, denom
+        return loss, denom.sum()
 
 class AdaGrad(Optimizer):
     def __init__(self, params, lr=1e-2, eps=1e-10):
@@ -338,4 +334,4 @@ class AdaGrad(Optimizer):
 
                 state['sum_grads'] = sum_grads.clone()
 
-        return loss, denom
+        return loss, denom.sum()
