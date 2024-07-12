@@ -1,8 +1,6 @@
 import torch
 from torch.optim import Optimizer
 
-from utils import *
-
 
 
 class AdamWithDiff(Optimizer):
@@ -138,7 +136,6 @@ class Adam(Optimizer):
                 state['step'] = 0                               # Steps for optimization
                 state['m'] = torch.zeros_like(p.data)      # Exponential moving average of gradient values
                 state['v'] = torch.zeros_like(p.data)   # Exponential moving average of squared gradient values
-                state['prev_grad'] = torch.zeros_like(p.data)   # Previous gradient
     
     def __setstate__(self, state):
         super(AdamWithDiff, self).__setstate__(state)
@@ -169,9 +166,8 @@ class Adam(Optimizer):
                 state = self.state[p]
 
                 state['step'] += 1 
-                m, v, prev_grad, = state['m'], state['v'], state['prev_grad']
+                m, v = state['m'], state['v']
                 beta1, beta2 = group['betas']
-                # lr, eps = group['lr'], group['eps']
 
                 # Just adding the square of the weights to the loss function is *not*
                 # the correct way of using L2 regularization/weight decay with Adam,
@@ -196,8 +192,7 @@ class Adam(Optimizer):
 
                 p.data.addcdiv_(-group['lr'], m_hat, denom)
 
-                state['prev_grad'] = grad.clone()
-                state['m'], state['v'] = m, v
+                state['m'], state['v'] = m.clone(), v.clone()
                 
         return loss, denom
 
