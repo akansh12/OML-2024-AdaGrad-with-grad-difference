@@ -127,19 +127,19 @@ def plot_metrics(train_losses, train_accuracies, val_losses, val_accuracies, plo
 
 def df_model(with_batch_norm, device):
     if with_batch_norm:
-        model = models.resnet50(weights=None)
+        model = models.resnet34(weights=None)
         num_ftrs = model.fc.in_features
         model.fc = nn.Linear(num_ftrs, 10)
         model = model.to(device)
         return model
     else:
-        model = models.resnet50(weights=None)
+        model = models.resnet34(weights=None)
         model = remove_batch_norm_layers(model)
         num_ftrs = model.fc.in_features
         model.fc = nn.Linear(num_ftrs, 10)
         model = model.to(device)
         return model # Implement the model without batch normalization
-
+    
 def remove_batch_norm_layers(model):
     for name, module in model.named_children():
         if isinstance(module, nn.BatchNorm2d):
@@ -150,29 +150,50 @@ def remove_batch_norm_layers(model):
 
 
 # Main function to run the training and validation
-def main(model, batch_size, learning_rate, num_epochs, experiment_name, save_path):
+def main(model, optimizer, batch_size, num_epochs, experiment_name, save_path, plot = False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     trainloader, testloader = load_data(batch_size)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    
 
     train_losses, train_accuracies, val_losses, val_accuracies = train_model(model, trainloader, criterion, optimizer, device, num_epochs, testloader)
 
     # save the train-val loss and accuracy
+    os.makedirs(save_path, exist_ok=True)
     np.save(save_path + experiment_name + '_train_losses.npy', train_losses)
     np.save(save_path + experiment_name + '_train_accuracies.npy', train_accuracies)
     np.save(save_path + experiment_name + '_val_losses.npy', val_losses)
     np.save(save_path + experiment_name + '_val_accuracies.npy', val_accuracies)
 
-    # plot_metrics(train_losses, train_accuracies, val_losses, val_accuracies, experiment_name)
+
+    if plot:
+        plot_metrics(train_losses, train_accuracies, val_losses, val_accuracies, experiment_name)
 
     return train_losses, train_accuracies, val_losses, val_accuracies
 
-if __name__ == '__main__':
-    model = df_model(with_batch_norm=True, device=torch.device("cuda"))
-    train_losses, train_accuracies, val_losses, val_accuracies = main(model, batch_size=256, learning_rate=0.001, num_epochs=100, experiment_name='resnet50_with_ADAM_with_batch_norm', save_path='./results/')
 
+if __name__ == '__main__':
+
+    #AdamWithDiff with batch norm
+    model = df_model(with_batch_norm=True, device=torch.device("cuda"))
+    opt = AdamWithDiff(model.parameters())
+    train_losses, train_accuracies, val_losses, val_accuracies = main(model,optimizer= opt, batch_size=256, num_epochs=100, experiment_name='resnet34_with_ADAMwithdiff_with_batch_norm', save_path='./results/')
+
+    #AdamWithDiff without batch norm
     model = df_model(with_batch_norm=False, device=torch.device("cuda"))
-    train_losses, train_accuracies, val_losses, val_accuracies = main(model, batch_size=256, learning_rate=0.001, num_epochs=100, experiment_name='resnet50_with_ADAM_without_batch_norm', save_path='./results/')
+    opt = AdamWithDiff(model.parameters())
+    train_losses, train_accuracies, val_losses, val_accuracies = main(model,optimizer= opt, batch_size=256, num_epochs=100, experiment_name='resnet34_with_ADAMwithdiff_without_batch_norm', save_path='./results/')
+
+    #AdaGradWithDiff with batch norm
+    model = df_model(with_batch_norm=True, device=torch.device("cuda"))
+    opt = AdaGradWithDiff(model.parameters())
+    train_losses, train_accuracies, val_losses, val_accuracies = main(model,optimizer= opt, batch_size=256, num_epochs=100, experiment_name='resnet34_with_AdaGradWithDiff_with_batch_norm', save_path='./results/')
+
+    #AdaGradWithDiff without batch norm
+    model = df_model(with_batch_norm=False, device=torch.device("cuda"))
+    opt = AdaGradWithDiff(model.parameters())
+    train_losses, train_accuracies, val_losses, val_accuracies = main(model,optimizer= opt, batch_size=256, num_epochs=100, experiment_name='resnet34_with_AdaGradWithDiff_without_batch_norm', save_path='./results/')
+
+
