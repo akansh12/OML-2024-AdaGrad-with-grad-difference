@@ -6,6 +6,12 @@ import torchvision.transforms as transforms
 from torchvision import models
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
+import optimizer
+import warnings
+import os
+from optimizer import Adam, AdamWithDiff, AdaGradWithDiff, AdaGrad
+warnings.filterwarnings('ignore')
 
 # Function to load CIFAR10 dataset
 def load_data(batch_size):
@@ -117,6 +123,7 @@ def plot_metrics(train_losses, train_accuracies, val_losses, val_accuracies, plo
     plt.title('Accuracy')
 
     plt.show()
+    plt.close()
 
 def df_model(with_batch_norm, device):
     if with_batch_norm:
@@ -159,7 +166,7 @@ def main(model, batch_size, learning_rate, num_epochs, experiment_name, save_pat
     np.save(save_path + experiment_name + '_val_losses.npy', val_losses)
     np.save(save_path + experiment_name + '_val_accuracies.npy', val_accuracies)
 
-    plot_metrics(train_losses, train_accuracies, val_losses, val_accuracies, experiment_name)
+    # plot_metrics(train_losses, train_accuracies, val_losses, val_accuracies, experiment_name)
 
     return train_losses, train_accuracies, val_losses, val_accuracies
 
